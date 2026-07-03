@@ -1,0 +1,734 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Scriptorium — Audio Bible Reader</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Spectral:ital,wght@0,400;0,500;0,600;1,400&family=Cormorant+Garamond:wght@600;700&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+<link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
+<style>
+  :root{
+    --ink:#12151c;
+    --ink-panel:#1a202b;
+    --ink-panel-2:#212836;
+    --parchment:#f1e9d8;
+    --parchment-dim:#cabfa8;
+    --gold:#c9a24b;
+    --gold-soft:#8a7b58;
+    --rubric:#a8433a;
+    --border:#2c3444;
+  }
+  *{box-sizing:border-box;}
+  html,body{height:100%;}
+  body{
+    background:var(--ink);
+    color:var(--parchment);
+    font-family:'Inter',sans-serif;
+    min-height:100vh;
+    display:flex;
+    flex-direction:column;
+  }
+  ::selection{background:var(--gold);color:var(--ink);}
+
+  /* Navbar */
+  .navbar-scriptorium{
+    background:linear-gradient(180deg,#0f121a,#151b26);
+    border-bottom:1px solid var(--border);
+  }
+  .brand-mark{
+    font-family:'Cormorant Garamond',serif;
+    font-weight:700;
+    font-size:1.55rem;
+    color:var(--parchment);
+    letter-spacing:.02em;
+  }
+  .brand-mark .accent{ color:var(--gold); }
+  .nav-eyebrow{
+    font-size:.65rem;
+    letter-spacing:.18em;
+    text-transform:uppercase;
+    color:var(--gold-soft);
+  }
+  .navbar-scriptorium .form-select,
+  .navbar-scriptorium .btn-outline-gold{
+    background:var(--ink-panel);
+    color:var(--parchment);
+    border:1px solid var(--border);
+  }
+  .navbar-scriptorium .form-select:focus{
+    border-color:var(--gold);
+    box-shadow:0 0 0 .2rem rgba(201,162,75,.15);
+  }
+  .btn-outline-gold{
+    border:1px solid var(--gold-soft);
+    color:var(--gold);
+  }
+  .btn-outline-gold:hover{
+    background:var(--gold);
+    color:var(--ink);
+    border-color:var(--gold);
+  }
+  .btn-gold{
+    background:var(--gold);
+    color:var(--ink);
+    border:1px solid var(--gold);
+    font-weight:600;
+  }
+  .btn-gold:hover{ background:#dbb862; color:var(--ink); }
+  .btn-gold:disabled{ opacity:.45; }
+
+  /* Layout */
+  main{ flex:1 0 auto; }
+  .reading-shell{
+    max-width:880px;
+    margin:0 auto;
+    padding:2.75rem 1.25rem 6rem;
+    position:relative;
+  }
+
+  /* Ribbon bookmark — signature element, tracks audio progress */
+  .ribbon-track{
+    position:fixed;
+    top:0;
+    right:0;
+    width:6px;
+    height:100vh;
+    background:rgba(255,255,255,.03);
+    z-index:5;
+  }
+  .ribbon-fill{
+    width:100%;
+    background:linear-gradient(180deg,var(--gold),var(--rubric));
+    height:0%;
+    transition:height .25s linear;
+  }
+
+  .passage-heading{
+    font-family:'Cormorant Garamond',serif;
+    font-weight:700;
+    font-size:2.6rem;
+    color:var(--parchment);
+    margin-bottom:.15rem;
+  }
+  .passage-sub{
+    font-size:.78rem;
+    letter-spacing:.14em;
+    text-transform:uppercase;
+    color:var(--gold-soft);
+    margin-bottom:1.75rem;
+  }
+  .divider-gold{
+    border:none;
+    height:1px;
+    background:linear-gradient(90deg,var(--gold),transparent);
+    margin:0 0 2rem;
+    width:120px;
+  }
+
+  .scripture{
+    font-family:'Spectral',serif;
+    font-size:1.28rem;
+    line-height:1.95;
+    color:var(--parchment);
+  }
+  .scripture .verse{
+    transition:background .3s ease, color .3s ease;
+    border-radius:3px;
+    padding:0 .1rem;
+  }
+  .scripture .verse.active-verse{
+    background:rgba(201,162,75,.16);
+    box-shadow:inset 2px 0 0 var(--gold);
+    padding-left:.4rem;
+  }
+  .verse-num{
+    font-family:'Inter',sans-serif;
+    font-size:.68rem;
+    font-weight:700;
+    color:var(--gold);
+    vertical-align:super;
+    margin-right:.15rem;
+  }
+  .drop-cap::first-letter{
+    font-family:'Cormorant Garamond',serif;
+    font-size:3.6rem;
+    font-weight:700;
+    color:var(--gold);
+    float:left;
+    line-height:.82;
+    padding-right:.12rem;
+    padding-top:.1rem;
+  }
+
+  .state-panel{
+    text-align:center;
+    padding:3.5rem 1rem;
+    color:var(--gold-soft);
+    font-family:'Spectral',serif;
+    font-style:italic;
+  }
+
+  /* Audio bar */
+  .audio-bar{
+    position:sticky;
+    top:0;
+    z-index:20;
+    background:rgba(21,27,38,.92);
+    backdrop-filter:blur(6px);
+    border-bottom:1px solid var(--border);
+    padding:.65rem 1rem;
+  }
+  .audio-bar .btn-icon{
+    width:40px;height:40px;
+    border-radius:50%;
+    display:inline-flex;
+    align-items:center;
+    justify-content:center;
+    padding:0;
+  }
+  .rate-label{
+    font-size:.72rem;
+    color:var(--gold-soft);
+    letter-spacing:.06em;
+  }
+  .form-range::-webkit-slider-thumb{ background:var(--gold); }
+  .form-range::-moz-range-thumb{ background:var(--gold); }
+
+  /* Sidebar offcanvas book list */
+  .offcanvas-scriptorium{
+    background:var(--ink-panel);
+    color:var(--parchment);
+    border-right:1px solid var(--border);
+  }
+  .book-group-label{
+    font-size:.68rem;
+    letter-spacing:.16em;
+    text-transform:uppercase;
+    color:var(--gold-soft);
+    padding:.9rem 1rem .3rem;
+  }
+  .book-link{
+    display:block;
+    padding:.42rem 1rem;
+    color:var(--parchment-dim);
+    text-decoration:none;
+    font-size:.92rem;
+    border-left:2px solid transparent;
+  }
+  .book-link:hover{ background:var(--ink-panel-2); color:var(--parchment); }
+  .book-link.active{
+    color:var(--gold);
+    border-left-color:var(--gold);
+    background:var(--ink-panel-2);
+  }
+
+  .info-note{
+    font-size:.78rem;
+    color:var(--gold-soft);
+    border:1px solid var(--border);
+    background:var(--ink-panel);
+    border-radius:8px;
+    padding:.75rem 1rem;
+  }
+
+  /* Footer */
+  footer{
+    flex-shrink:0;
+    background:#0e1118;
+    border-top:1px solid var(--border);
+    padding:2.5rem 0 1.5rem;
+  }
+  footer .footer-brand{
+    font-family:'Cormorant Garamond',serif;
+    font-weight:700;
+    font-size:1.3rem;
+    color:var(--parchment);
+  }
+  footer a{
+    color:var(--parchment-dim);
+    text-decoration:none;
+    font-size:.88rem;
+  }
+  footer a:hover{ color:var(--gold); }
+  footer .footer-heading{
+    font-size:.68rem;
+    letter-spacing:.14em;
+    text-transform:uppercase;
+    color:var(--gold-soft);
+    margin-bottom:.75rem;
+  }
+  footer .footer-fine{
+    font-size:.75rem;
+    color:#5c6577;
+  }
+  footer hr{ border-color:var(--border); }
+
+  @media (max-width: 767px){
+    .passage-heading{ font-size:2rem; }
+    .scripture{ font-size:1.12rem; }
+  }
+</style>
+</head>
+<body>
+
+<!-- Ribbon progress indicator (signature element) -->
+<div class="ribbon-track"><div class="ribbon-fill" id="ribbonFill"></div></div>
+
+<!-- NAVIGATION -->
+<nav class="navbar navbar-scriptorium navbar-expand-lg sticky-top" data-bs-theme="dark">
+  <div class="container-fluid px-3 px-lg-4">
+    <button class="btn btn-outline-gold btn-sm me-2 d-lg-none" type="button" data-bs-toggle="offcanvas" data-bs-target="#bookNav">
+      ☰
+    </button>
+    <a class="navbar-brand brand-mark py-0" href="#">Script<span class="accent">orium</span></a>
+
+    <button class="navbar-toggler d-none d-lg-none" type="button"></button>
+
+    <div class="d-none d-lg-flex align-items-center gap-2 flex-grow-1 justify-content-center">
+      <select id="bookSelectTop" class="form-select form-select-sm" style="max-width:190px;"></select>
+      <select id="chapterSelectTop" class="form-select form-select-sm" style="max-width:100px;"></select>
+      <select id="translationSelect" class="form-select form-select-sm" style="max-width:150px;">
+        <option value="web" selected>World English Bible</option>
+        <option value="kjv">King James Version</option>
+      </select>
+    </div>
+
+    <div class="d-flex align-items-center gap-2">
+      <button id="prevChapterBtn" class="btn btn-outline-gold btn-sm" title="Previous chapter">‹</button>
+      <button id="nextChapterBtn" class="btn btn-outline-gold btn-sm" title="Next chapter">›</button>
+    </div>
+  </div>
+
+  <!-- mobile selectors -->
+  <div class="d-lg-none w-100 px-3 pb-2 pt-1 d-flex gap-2">
+    <select id="bookSelectMobile" class="form-select form-select-sm"></select>
+    <select id="chapterSelectMobile" class="form-select form-select-sm" style="max-width:90px;"></select>
+  </div>
+</nav>
+
+<!-- Offcanvas full book list -->
+<div class="offcanvas offcanvas-start offcanvas-scriptorium" tabindex="-1" id="bookNav">
+  <div class="offcanvas-header border-bottom" style="border-color:var(--border) !important;">
+    <span class="nav-eyebrow">Table of Books</span>
+    <button type="button" class="btn-close btn-close-white" data-bs-dismiss="offcanvas"></button>
+  </div>
+  <div class="offcanvas-body p-0" id="offcanvasBookList"></div>
+</div>
+
+<!-- AUDIO CONTROL BAR -->
+<div class="audio-bar">
+  <div class="container-fluid px-3 px-lg-4">
+    <div class="d-flex align-items-center flex-wrap gap-2">
+      <button id="playBtn" class="btn btn-gold btn-icon" title="Play">▶</button>
+      <button id="pauseBtn" class="btn btn-outline-gold btn-icon" title="Pause" disabled>❚❚</button>
+      <button id="stopBtn" class="btn btn-outline-gold btn-icon" title="Stop" disabled>■</button>
+
+      <select id="voiceSelect" class="form-select form-select-sm ms-2" style="max-width:230px;"></select>
+
+      <div class="d-flex align-items-center gap-2 ms-2">
+        <span class="rate-label">SPEED</span>
+        <input type="range" class="form-range" id="rateRange" min="0.6" max="1.4" step="0.1" value="1" style="width:100px;">
+        <span class="rate-label" id="rateVal">1.0×</span>
+      </div>
+
+      <span class="ms-auto small" id="audioStatus" style="color:var(--gold-soft);">Ready</span>
+    </div>
+  </div>
+</div>
+
+<!-- MAIN READING AREA -->
+<main>
+  <div class="reading-shell">
+    <div class="info-note mb-4" id="translationNote"></div>
+    <div id="passageContainer">
+      <div class="state-panel">Choose a book and chapter to begin reading.</div>
+    </div>
+  </div>
+</main>
+
+<!-- FOOTER -->
+<footer>
+  <div class="container">
+    <div class="row gy-4">
+      <div class="col-md-4">
+        <div class="footer-brand mb-2">Script<span style="color:var(--gold);">orium</span></div>
+        <p class="footer-fine mb-0">A quiet place to read and listen to Scripture. Text is fetched live, chapter by chapter, from a public‑domain translation source.</p>
+      </div>
+      <div class="col-md-2">
+        <div class="footer-heading">Navigate</div>
+        <ul class="list-unstyled d-flex flex-column gap-2">
+          <li><a href="#" id="footerHome">Old Testament</a></li>
+          <li><a href="#" id="footerNT">New Testament</a></li>
+          <li><a href="#" data-bs-toggle="offcanvas" data-bs-target="#bookNav">All Books</a></li>
+        </ul>
+      </div>
+      <div class="col-md-3">
+        <div class="footer-heading">About the Text</div>
+        <ul class="list-unstyled d-flex flex-column gap-2">
+          <li><a href="https://worldenglish.bible" target="_blank" rel="noopener">World English Bible</a></li>
+          <li><a href="https://www.kingjamesbibleonline.org" target="_blank" rel="noopener">King James Version</a></li>
+          <li><a href="#" id="footerAbout">Translation notice</a></li>
+        </ul>
+      </div>
+      <div class="col-md-3">
+        <div class="footer-heading">Audio</div>
+        <p class="footer-fine mb-0">Narration uses your browser's built‑in speech engine. Choose any available male English voice from the audio bar above.</p>
+      </div>
+    </div>
+    <hr class="my-4">
+    <div class="d-flex flex-column flex-md-row justify-content-between align-items-center gap-2">
+      <span class="footer-fine">© <span id="year"></span> Scriptorium. Scripture text sourced from public‑domain translations.</span>
+      <span class="footer-fine">Built as a dynamic, browser‑based reader.</span>
+      
+      <footer style="text-align: center; padding: 20px; margin-top: 40px; font-size: 0.85rem; color: #888; border-top: 1px solid #e0e0e0;">
+  <p>© 2026. Created by Lona Smith in the Republic of South Africa · <a href="mailto:lonasmithhq@gmail.com" style="color: #888; text-decoration: none;">lonasmithhq@gmail.com</a></p>
+</footer>
+      
+      
+    </div>
+  </div>
+</footer>
+
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
+<script>
+document.getElementById('year').textContent = new Date().getFullYear();
+
+/* ---------------------------------------------------
+   BIBLE DATA: 66 books, standard chapter counts,
+   grouped Old / New Testament. Public-domain facts,
+   no copyrighted text stored here.
+--------------------------------------------------- */
+const BOOKS = [
+  // Old Testament
+  {name:"Genesis",ch:50,t:"OT"},{name:"Exodus",ch:40,t:"OT"},{name:"Leviticus",ch:27,t:"OT"},
+  {name:"Numbers",ch:36,t:"OT"},{name:"Deuteronomy",ch:34,t:"OT"},{name:"Joshua",ch:24,t:"OT"},
+  {name:"Judges",ch:21,t:"OT"},{name:"Ruth",ch:4,t:"OT"},{name:"1 Samuel",ch:31,t:"OT"},
+  {name:"2 Samuel",ch:24,t:"OT"},{name:"1 Kings",ch:22,t:"OT"},{name:"2 Kings",ch:25,t:"OT"},
+  {name:"1 Chronicles",ch:29,t:"OT"},{name:"2 Chronicles",ch:36,t:"OT"},{name:"Ezra",ch:10,t:"OT"},
+  {name:"Nehemiah",ch:13,t:"OT"},{name:"Esther",ch:10,t:"OT"},{name:"Job",ch:42,t:"OT"},
+  {name:"Psalms",ch:150,t:"OT"},{name:"Proverbs",ch:31,t:"OT"},{name:"Ecclesiastes",ch:12,t:"OT"},
+  {name:"Song of Solomon",ch:8,t:"OT"},{name:"Isaiah",ch:66,t:"OT"},{name:"Jeremiah",ch:52,t:"OT"},
+  {name:"Lamentations",ch:5,t:"OT"},{name:"Ezekiel",ch:48,t:"OT"},{name:"Daniel",ch:12,t:"OT"},
+  {name:"Hosea",ch:14,t:"OT"},{name:"Joel",ch:3,t:"OT"},{name:"Amos",ch:9,t:"OT"},
+  {name:"Obadiah",ch:1,t:"OT"},{name:"Jonah",ch:4,t:"OT"},{name:"Micah",ch:7,t:"OT"},
+  {name:"Nahum",ch:3,t:"OT"},{name:"Habakkuk",ch:3,t:"OT"},{name:"Zephaniah",ch:3,t:"OT"},
+  {name:"Haggai",ch:2,t:"OT"},{name:"Zechariah",ch:14,t:"OT"},{name:"Malachi",ch:4,t:"OT"},
+  // New Testament
+  {name:"Matthew",ch:28,t:"NT"},{name:"Mark",ch:16,t:"NT"},{name:"Luke",ch:24,t:"NT"},
+  {name:"John",ch:21,t:"NT"},{name:"Acts",ch:28,t:"NT"},{name:"Romans",ch:16,t:"NT"},
+  {name:"1 Corinthians",ch:16,t:"NT"},{name:"2 Corinthians",ch:13,t:"NT"},{name:"Galatians",ch:6,t:"NT"},
+  {name:"Ephesians",ch:6,t:"NT"},{name:"Philippians",ch:4,t:"NT"},{name:"Colossians",ch:4,t:"NT"},
+  {name:"1 Thessalonians",ch:5,t:"NT"},{name:"2 Thessalonians",ch:3,t:"NT"},{name:"1 Timothy",ch:6,t:"NT"},
+  {name:"2 Timothy",ch:4,t:"NT"},{name:"Titus",ch:3,t:"NT"},{name:"Philemon",ch:1,t:"NT"},
+  {name:"Hebrews",ch:13,t:"NT"},{name:"James",ch:5,t:"NT"},{name:"1 Peter",ch:5,t:"NT"},
+  {name:"2 Peter",ch:3,t:"NT"},{name:"1 John",ch:5,t:"NT"},{name:"2 John",ch:1,t:"NT"},
+  {name:"3 John",ch:1,t:"NT"},{name:"Jude",ch:1,t:"NT"},{name:"Revelation",ch:22,t:"NT"}
+];
+
+const TRANSLATION_NOTES = {
+  web:"Reading the World English Bible (WEB) — a modern, public‑domain translation. Text is fetched dynamically per chapter, nothing is stored locally.",
+  kjv:"Reading the King James Version (KJV) — public domain. Text is fetched dynamically per chapter, nothing is stored locally."
+};
+
+let state = {
+  book: "John",
+  chapter: 1,
+  translation: "web",
+  verses: [],       // [{num, text}]
+  utterance: null,
+  voices: [],
+  playing: false
+};
+
+/* ---------------------------------------------------
+   NAVIGATION: populate selectors + offcanvas list
+--------------------------------------------------- */
+function populateBookSelectors(){
+  const selects = [document.getElementById('bookSelectTop'), document.getElementById('bookSelectMobile')];
+  selects.forEach(sel=>{
+    sel.innerHTML = "";
+    ["OT","NT"].forEach(section=>{
+      const group = document.createElement('optgroup');
+      group.label = section === "OT" ? "Old Testament" : "New Testament";
+      BOOKS.filter(b=>b.t===section).forEach(b=>{
+        const opt = document.createElement('option');
+        opt.value = b.name; opt.textContent = b.name;
+        group.appendChild(opt);
+      });
+      sel.appendChild(group);
+    });
+    sel.value = state.book;
+  });
+}
+
+function populateChapterSelectors(){
+  const bookData = BOOKS.find(b=>b.name===state.book);
+  const selects = [document.getElementById('chapterSelectTop'), document.getElementById('chapterSelectMobile')];
+  selects.forEach(sel=>{
+    sel.innerHTML = "";
+    for(let i=1;i<=bookData.ch;i++){
+      const opt = document.createElement('option');
+      opt.value = i; opt.textContent = "Ch " + i;
+      sel.appendChild(opt);
+    }
+    sel.value = state.chapter;
+  });
+}
+
+function populateOffcanvas(){
+  const container = document.getElementById('offcanvasBookList');
+  container.innerHTML = "";
+  ["OT","NT"].forEach(section=>{
+    const label = document.createElement('div');
+    label.className = "book-group-label";
+    label.textContent = section === "OT" ? "Old Testament" : "New Testament";
+    container.appendChild(label);
+    BOOKS.filter(b=>b.t===section).forEach(b=>{
+      const a = document.createElement('a');
+      a.href = "#";
+      a.className = "book-link" + (b.name===state.book ? " active" : "");
+      a.textContent = b.name;
+      a.dataset.book = b.name;
+      a.addEventListener('click', e=>{
+        e.preventDefault();
+        goTo(b.name, 1);
+        bootstrap.Offcanvas.getOrCreateInstance(document.getElementById('bookNav')).hide();
+      });
+      container.appendChild(a);
+    });
+  });
+}
+
+function syncSelectors(){
+  document.getElementById('bookSelectTop').value = state.book;
+  document.getElementById('bookSelectMobile').value = state.book;
+  populateChapterSelectors();
+  document.getElementById('chapterSelectTop').value = state.chapter;
+  document.getElementById('chapterSelectMobile').value = state.chapter;
+  populateOffcanvas();
+}
+
+/* ---------------------------------------------------
+   DYNAMIC FETCH: pulls chapter text live, per request.
+   Swap BASE_URL / add headers here to plug in a
+   licensed NLT source (e.g. api.bible) later.
+--------------------------------------------------- */
+async function fetchChapter(book, chapter, translation){
+  const ref = encodeURIComponent(`${book} ${chapter}`).replace(/%20/g, "+");
+  const url = `https://bible-api.com/${ref}?translation=${translation}`;
+  const res = await fetch(url);
+  if(!res.ok) throw new Error("Fetch failed: " + res.status);
+  const data = await res.json();
+  if(!data.verses) throw new Error("No verses returned");
+  return data.verses.map(v => ({num: v.verse, text: v.text.trim()}));
+}
+
+function renderPassage(){
+  const container = document.getElementById('passageContainer');
+  const bookData = BOOKS.find(b=>b.name===state.book);
+  const isLast = state.chapter >= bookData.ch;
+  const isFirst = state.chapter <= 1;
+  document.getElementById('prevChapterBtn').disabled = isFirst && BOOKS.indexOf(bookData)===0;
+  document.getElementById('nextChapterBtn').disabled = isLast && BOOKS.indexOf(bookData)===BOOKS.length-1;
+
+  const versesHtml = state.verses.map((v,i)=>
+    `<span class="verse" data-vindex="${i}"><span class="verse-num">${v.num}</span>${v.text} </span>`
+  ).join("");
+
+  container.innerHTML = `
+    <p class="passage-sub">${state.translation === 'web' ? 'World English Bible' : 'King James Version'}</p>
+    <h1 class="passage-heading">${state.book} ${state.chapter}</h1>
+    <hr class="divider-gold">
+    <p class="scripture drop-cap">${versesHtml}</p>
+  `;
+}
+
+function renderState(msg){
+  document.getElementById('passageContainer').innerHTML = `<div class="state-panel">${msg}</div>`;
+}
+
+async function goTo(book, chapter){
+  stopAudio();
+  state.book = book;
+  state.chapter = chapter;
+  syncSelectors();
+  renderState("Loading passage…");
+  try{
+    state.verses = await fetchChapter(state.book, state.chapter, state.translation);
+    renderPassage();
+  }catch(err){
+    renderState("Couldn't load this passage right now. Please check your connection and try again.");
+    console.error(err);
+  }
+}
+
+/* ---------------------------------------------------
+   NAV EVENTS
+--------------------------------------------------- */
+['bookSelectTop','bookSelectMobile'].forEach(id=>{
+  document.getElementById(id).addEventListener('change', e=> goTo(e.target.value, 1));
+});
+['chapterSelectTop','chapterSelectMobile'].forEach(id=>{
+  document.getElementById(id).addEventListener('change', e=> goTo(state.book, parseInt(e.target.value)));
+});
+document.getElementById('translationSelect').addEventListener('change', e=>{
+  state.translation = e.target.value;
+  document.getElementById('translationNote').textContent = TRANSLATION_NOTES[state.translation];
+  goTo(state.book, state.chapter);
+});
+document.getElementById('prevChapterBtn').addEventListener('click', ()=>{
+  const idx = BOOKS.findIndex(b=>b.name===state.book);
+  if(state.chapter > 1){ goTo(state.book, state.chapter - 1); }
+  else if(idx > 0){ goTo(BOOKS[idx-1].name, BOOKS[idx-1].ch); }
+});
+document.getElementById('nextChapterBtn').addEventListener('click', ()=>{
+  const idx = BOOKS.findIndex(b=>b.name===state.book);
+  const bookData = BOOKS[idx];
+  if(state.chapter < bookData.ch){ goTo(state.book, state.chapter + 1); }
+  else if(idx < BOOKS.length-1){ goTo(BOOKS[idx+1].name, 1); }
+});
+document.getElementById('footerHome').addEventListener('click', e=>{ e.preventDefault(); goTo("Genesis",1); });
+document.getElementById('footerNT').addEventListener('click', e=>{ e.preventDefault(); goTo("Matthew",1); });
+document.getElementById('footerAbout').addEventListener('click', e=>{
+  e.preventDefault();
+  alert("This reader displays public-domain translations (World English Bible / King James Version) fetched live per chapter. The NLT (New Living Translation) is copyrighted by Tyndale House Foundation and is not included here; a licensed API would be required to add it.");
+});
+
+/* ---------------------------------------------------
+   AUDIO: Web Speech API, male voice selection
+--------------------------------------------------- */
+const synth = window.speechSynthesis;
+const playBtn = document.getElementById('playBtn');
+const pauseBtn = document.getElementById('pauseBtn');
+const stopBtn = document.getElementById('stopBtn');
+const voiceSelect = document.getElementById('voiceSelect');
+const rateRange = document.getElementById('rateRange');
+const rateVal = document.getElementById('rateVal');
+const audioStatus = document.getElementById('audioStatus');
+const ribbonFill = document.getElementById('ribbonFill');
+
+const MALE_HINTS = ["male","david","daniel","alex","fred","mark","james","tom","guy","george","aaron","arthur","ryan","eric","liam","matthew","oliver","fred","paul","rishi"];
+
+function loadVoices(){
+  state.voices = synth.getVoices().filter(v => v.lang.startsWith("en"));
+  voiceSelect.innerHTML = "";
+  if(state.voices.length === 0){
+    const opt = document.createElement('option');
+    opt.textContent = "No voices found";
+    voiceSelect.appendChild(opt);
+    return;
+  }
+  state.voices.forEach((v,i)=>{
+    const opt = document.createElement('option');
+    opt.value = i;
+    const likelyMale = MALE_HINTS.some(h => v.name.toLowerCase().includes(h));
+    opt.textContent = v.name + (likelyMale ? " (male)" : "");
+    voiceSelect.appendChild(opt);
+  });
+  const maleIdx = state.voices.findIndex(v => MALE_HINTS.some(h => v.name.toLowerCase().includes(h)));
+  voiceSelect.value = maleIdx >= 0 ? maleIdx : 0;
+}
+if(synth){
+  synth.onvoiceschanged = loadVoices;
+  loadVoices();
+}
+
+rateRange.addEventListener('input', ()=> rateVal.textContent = parseFloat(rateRange.value).toFixed(1) + "×");
+
+function buildUtterance(){
+  const fullText = state.verses.map(v=>v.text).join(" ");
+  const utter = new SpeechSynthesisUtterance(fullText);
+  const chosenVoice = state.voices[parseInt(voiceSelect.value)];
+  if(chosenVoice) utter.voice = chosenVoice;
+  utter.rate = parseFloat(rateRange.value);
+  utter.lang = "en-US";
+
+  let charOffset = 0;
+  const boundaries = state.verses.map(v=>{
+    const start = charOffset;
+    charOffset += v.text.length + 1;
+    return start;
+  });
+
+  utter.onboundary = (e)=>{
+    if(e.name !== "word" && e.name !== undefined) {
+      // continue anyway, some engines omit name
+    }
+    let activeIdx = 0;
+    for(let i=0;i<boundaries.length;i++){
+      if(e.charIndex >= boundaries[i]) activeIdx = i; else break;
+    }
+    highlightVerse(activeIdx);
+    const pct = Math.min(100, (e.charIndex / fullText.length) * 100);
+    ribbonFill.style.height = pct + "%";
+  };
+  utter.onend = ()=>{
+    resetAudioButtons();
+    ribbonFill.style.height = "0%";
+    audioStatus.textContent = "Finished";
+  };
+  utter.onerror = ()=>{
+    resetAudioButtons();
+    audioStatus.textContent = "Audio error";
+  };
+  return utter;
+}
+
+function highlightVerse(idx){
+  document.querySelectorAll('.verse').forEach(el=>el.classList.remove('active-verse'));
+  const el = document.querySelector(`.verse[data-vindex="${idx}"]`);
+  if(el) el.classList.add('active-verse');
+}
+
+function playAudio(){
+  if(!synth){ audioStatus.textContent = "Speech not supported in this browser"; return; }
+  if(state.verses.length === 0){ audioStatus.textContent = "Load a passage first"; return; }
+  synth.cancel();
+  state.utterance = buildUtterance();
+  synth.speak(state.utterance);
+  state.playing = true;
+  playBtn.disabled = true;
+  pauseBtn.disabled = false;
+  stopBtn.disabled = false;
+  audioStatus.textContent = "Playing " + state.book + " " + state.chapter;
+}
+function pauseAudio(){
+  if(synth.speaking && !synth.paused){
+    synth.pause();
+    audioStatus.textContent = "Paused";
+    pauseBtn.textContent = "▶";
+  } else if(synth.paused){
+    synth.resume();
+    audioStatus.textContent = "Playing " + state.book + " " + state.chapter;
+    pauseBtn.textContent = "❚❚";
+  }
+}
+function stopAudio(){
+  if(synth) synth.cancel();
+  resetAudioButtons();
+  ribbonFill.style.height = "0%";
+  document.querySelectorAll('.verse').forEach(el=>el.classList.remove('active-verse'));
+  audioStatus.textContent = "Ready";
+}
+function resetAudioButtons(){
+  state.playing = false;
+  playBtn.disabled = false;
+  pauseBtn.disabled = true;
+  pauseBtn.textContent = "❚❚";
+  stopBtn.disabled = true;
+}
+
+playBtn.addEventListener('click', playAudio);
+pauseBtn.addEventListener('click', pauseAudio);
+stopBtn.addEventListener('click', stopAudio);
+
+/* ---------------------------------------------------
+   INIT
+--------------------------------------------------- */
+populateBookSelectors();
+document.getElementById('translationNote').textContent = TRANSLATION_NOTES[state.translation];
+goTo(state.book, state.chapter);
+</script>
+</body>
+</html>
